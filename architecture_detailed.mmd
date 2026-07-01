@@ -1,0 +1,89 @@
+flowchart TB
+
+    subgraph DATA["① DATA LAYER"]
+        DS["Germany Used Cars 2023 — Kaggle\n~200k rows, 10 columns"]
+        INGEST["CSV Ingestion"]
+        CLEAN["EDA and Basic Cleaning\nfix types, drop duplicates\nremove obvious invalid values"]
+        SPLIT["Train / Test Split\nrandom_state = 42"]
+        DS --> INGEST --> CLEAN --> SPLIT
+    end
+
+    subgraph TRAIN["② ML TRAINING LAYER  (offline)"]
+
+        THRESH["Compute Threshold from y_train_price only\ny_train_class = high or low\ny_test_class = same threshold applied\ntest prices never used to set threshold"]
+
+        subgraph PIPE["sklearn Pipeline — fitted on TRAINING data only"]
+            P1["Imputation\nmedian, most_frequent"]
+            P2["Feature Engineering\ncar_age, mileage_per_year\nbrand_tier, hp_age_interaction"]
+            P3["OneHotEncoder, StandardScaler"]
+            P4["Feature Selection\nSelectKBest or RFE"]
+            P1 --> P2 --> P3 --> P4
+        end
+
+        subgraph CLS_M["Classification  |  target: price_segment (high/low)  |  price excluded from features"]
+            CL1[Dummy Classifier]
+            CL2[Logistic Regression]
+            CL3[Decision Tree]
+            CL4[XGBoost + CV]
+            CLSBEST["Best Classifier  (by F1 and AUC-ROC)"]
+            CL1 --> CLSBEST
+            CL2 --> CLSBEST
+            CL3 --> CLSBEST
+            CL4 --> CLSBEST
+        end
+
+        subgraph REG_M["Regression  |  target: price in EUR"]
+            RL1[Dummy Regressor]
+            RL2[Ridge Regression]
+            RL3[Decision Tree]
+            RL4[XGBoost + CV]
+            REGBEST["Best Regressor  (by RMSE and R2)"]
+            RL1 --> REGBEST
+            RL2 --> REGBEST
+            RL3 --> REGBEST
+            RL4 --> REGBEST
+        end
+
+        EVAL["Final Evaluation on TEST SET only\nClassification: Accuracy, F1, AUC-ROC\nRegression: MAE, RMSE, R2\nModel Leaderboard"]
+
+        ARTS[("Saved Fitted Pipelines\nclassifier_pipeline.pkl\nregressor_pipeline.pkl\nprice_segment_threshold.json")]
+
+        SPLIT -->|"train set"| THRESH
+        SPLIT -->|"features only: price and price_segment excluded"| P1
+        SPLIT -->|"y_train_price"| REG_M
+        THRESH -->|"y_train_class"| CLS_M
+        P4 --> CL1
+        P4 --> CL2
+        P4 --> CL3
+        P4 --> CL4
+        P4 --> RL1
+        P4 --> RL2
+        P4 --> RL3
+        P4 --> RL4
+        CLSBEST --> EVAL
+        REGBEST --> EVAL
+        SPLIT -->|"test set — eval only, never fitted"| EVAL
+        THRESH -.->|"threshold creates y_test_class"| EVAL
+        EVAL --> ARTS
+    end
+
+    subgraph INFER["③ APP / INFERENCE LAYER  (online)"]
+        UI["Browser UI\nbrand, model, mileage, hp, year, fuel, gear"]
+        ST["Streamlit App Server"]
+        LM["Load Saved Pipelines\n+ price_segment_threshold.json"]
+        PR["Apply Saved Pipeline and Predict"]
+        RES["price_segment: HIGH or LOW\nPredicted price: X EUR\nEDA, model metrics, feature importances"]
+        UI --> ST --> LM --> PR --> RES
+    end
+
+    subgraph DEPLOY["④ DEPLOYMENT AND DELIVERABLES"]
+        GH["GitHub Repository\ncode, notebooks, pipelines, docs"]
+        SC["Streamlit Cloud — public URL"]
+        DL["Quarto Report, Slides\nExecutive Summary, AI Reflection"]
+        GH --> SC
+        GH --> DL
+    end
+
+    ARTS -.->|"load at startup"| LM
+    GH -.->|"source of truth"| TRAIN
+    SC --> INFER

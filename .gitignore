@@ -1,0 +1,56 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+dist/
+build/
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# Data — raw CSV is large; do NOT commit it
+data/raw/
+data/processed/
+
+# Secrets
+.env
+*.env
+secrets.*
+
+# macOS
+.DS_Store
+
+# App backup files
+app/app_backup_*.py
+app/app_final_premium_version.py
+app/assets/
+.AppleDouble
+
+# Quarto render artifacts
+/_site/
+/.quarto/
+*_files/
+*_cache/
+reports/*.html
+slides/*.html
+
+# Models (large binaries — optionally commit via Git LFS)
+# Remove lines below if you want to commit models directly
+# models/*.pkl
+# models/*.json
+
+# Playwright / test output
+.playwright-mcp/
+
+# IDE
+.vscode/
+.idea/
+*.swp

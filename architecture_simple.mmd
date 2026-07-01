@@ -1,0 +1,29 @@
+flowchart TB
+
+    subgraph OFFLINE["OFFLINE TRAINING  —  runs once before deployment"]
+        CSV["Kaggle CSV\nGermany Used Cars 2023  ~200k rows"]
+        EDA["EDA and Cleaning\nfix types, drop duplicates\nfilter out oldtimers and extreme prices"]
+        SPLIT["Train / Test Split\nrandom_state = 42"]
+        PIPE["sklearn Pipeline  fit on train set only\nImpute, Feature Engineering\nEncode, Scale, Select Features"]
+        CLS["Classification\ntarget: price_segment  high or low"]
+        REG["Regression\ntarget: price in EUR"]
+        EVAL["Evaluation on Test Set\nAccuracy, F1, AUC-ROC\nMAE, RMSE, R2"]
+        ARTS[("Saved Artifacts\nclassifier_pipeline.pkl\nregressor_pipeline.pkl\nprice_segment_threshold.json")]
+
+        CSV --> EDA --> SPLIT --> PIPE
+        PIPE --> CLS
+        PIPE --> REG
+        CLS --> EVAL
+        REG --> EVAL
+        EVAL --> ARTS
+    end
+
+    subgraph RUNTIME["RUNTIME APP  —  Streamlit, runs on demand"]
+        UI["Browser\nUser enters: brand, model, mileage\nhp, year, fuel type, gear"]
+        APP["Streamlit App\nloads saved pipelines at startup"]
+        RES["Predictions returned to browser\nprice_segment: HIGH or LOW\npredicted price: X EUR"]
+
+        UI --> APP --> RES
+    end
+
+    ARTS -.->|"loaded once at startup"| APP

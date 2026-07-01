@@ -1,0 +1,142 @@
+{
+  "random_state": 42,
+  "reproducibility_strategy": "LogisticRegression C=10, Ridge alpha=0.1, and Decision Tree max_depth=15 were selected via GridSearchCV/RidgeCV in a prior validated run and applied directly here for speed. XGBoost uses a small RandomizedSearchCV (n_iter=6, cv=3, tree_method=hist) for fast reproducible tuning.",
+  "pipeline_steps": [
+    "preprocessor (ColumnTransformer: OHE brand/model/fuel/transmission + StandardScaler)",
+    "selector (VarianceThreshold threshold=0.0 \u2014 leakage-safe, fitted on X_train only)",
+    "model"
+  ],
+  "feature_selection": {
+    "method": "VarianceThreshold(threshold=0.0)",
+    "leakage_safe": true,
+    "n_features_before": 559,
+    "n_features_removed": 0,
+    "finding": "Zero features removed \u2014 OHE with min_frequency=50 already eliminated all near-constant category columns. All 559 post-encoding features carry non-zero variance. VarianceThreshold serves as an architectural safeguard and auditable pipeline step."
+  },
+  "classification": {
+    "target": "price_segment (0=LOW, 1=HIGH)",
+    "threshold": 19486.0,
+    "best_model": "XGBoost (tuned)",
+    "f1_metric_note": "F1_macro used as primary metric. DummyClassifier's F1_binary=0.667 is misleading (always predicts HIGH, gets full recall on class 1 but zero on class 0). F1_macro=0.333 is the honest dummy baseline. With balanced 50/50 classes, F1_macro \u2248 F1_binary for all non-dummy models.",
+    "leaderboard": [
+      {
+        "Model": "Dummy (most_frequent)",
+        "Accuracy": 0.5,
+        "Precision": 0.5,
+        "Recall": 1.0,
+        "F1_binary": 0.6667,
+        "F1_macro": 0.3334,
+        "ROC-AUC": 0.5,
+        "Train_Acc": 0.5,
+        "Train_F1_macro": 0.3333,
+        "Fit_time_s": 3.7
+      },
+      {
+        "Model": "Logistic Regression (C=10)",
+        "Accuracy": 0.9291,
+        "Precision": 0.9283,
+        "Recall": 0.9299,
+        "F1_binary": 0.9291,
+        "F1_macro": 0.9291,
+        "ROC-AUC": 0.978,
+        "Train_Acc": 0.9328,
+        "Train_F1_macro": 0.9328,
+        "Fit_time_s": 303.3
+      },
+      {
+        "Model": "Decision Tree (depth=15)",
+        "Accuracy": 0.9189,
+        "Precision": 0.9229,
+        "Recall": 0.9142,
+        "F1_binary": 0.9185,
+        "F1_macro": 0.9189,
+        "ROC-AUC": 0.9445,
+        "Train_Acc": 0.9489,
+        "Train_F1_macro": 0.9489,
+        "Fit_time_s": 8.4
+      },
+      {
+        "Model": "XGBoost (tuned)",
+        "Accuracy": 0.9341,
+        "Precision": 0.9367,
+        "Recall": 0.9312,
+        "F1_binary": 0.9339,
+        "F1_macro": 0.9341,
+        "ROC-AUC": 0.9818,
+        "Train_Acc": 0.9461,
+        "Train_F1_macro": 0.9461,
+        "Fit_time_s": 18.9
+      }
+    ],
+    "hyperparameters": {
+      "LogisticRegression": "C=10 (from prior GridSearchCV [0.01,0.1,1,10], cv=3)",
+      "DecisionTree": "max_depth=15 (from prior GridSearchCV [5,10,15,None], cv=3)",
+      "XGBoost": "RandomizedSearchCV n_iter=6, cv=3, tree_method=hist; best={'colsample_bytree': np.float64(0.6749080237694725), 'learning_rate': np.float64(0.2426071459614874), 'max_depth': 7, 'n_estimators': 271, 'subsample': np.float64(0.8897987726295555)}"
+    }
+  },
+  "regression": {
+    "target": "price_in_euro",
+    "best_model": "XGBoost (tuned)",
+    "leaderboard": [
+      {
+        "Model": "Dummy (mean)",
+        "R2": -0.0,
+        "MAE": 10915.0,
+        "RMSE": 14369.0,
+        "Train_R2": 0.0,
+        "Train_RMSE": 14508.0,
+        "Fit_time_s": 3.8
+      },
+      {
+        "Model": "Ridge (alpha=0.1)",
+        "R2": 0.8412,
+        "MAE": 3761.0,
+        "RMSE": 5726.0,
+        "Train_R2": 0.8412,
+        "Train_RMSE": 5782.0,
+        "Fit_time_s": 4.3
+      },
+      {
+        "Model": "Decision Tree (depth=15)",
+        "R2": 0.856,
+        "MAE": 3279.0,
+        "RMSE": 5452.0,
+        "Train_R2": 0.9112,
+        "Train_RMSE": 4325.0,
+        "Fit_time_s": 9.9
+      },
+      {
+        "Model": "XGBoost (tuned)",
+        "R2": 0.9049,
+        "MAE": 2602.0,
+        "RMSE": 4430.0,
+        "Train_R2": 0.9223,
+        "Train_RMSE": 4044.0,
+        "Fit_time_s": 14.7
+      }
+    ],
+    "hyperparameters": {
+      "Ridge": "alpha=0.1 (from prior RidgeCV [0.1,1,10,100,1000])",
+      "DecisionTree": "max_depth=15 (from prior GridSearchCV [5,10,15,None], cv=3)",
+      "XGBoost": "RandomizedSearchCV n_iter=6, cv=3, tree_method=hist; best={'colsample_bytree': np.float64(0.6749080237694725), 'learning_rate': np.float64(0.2426071459614874), 'max_depth': 7, 'n_estimators': 271, 'subsample': np.float64(0.8897987726295555)}"
+    },
+    "caveat_linear_models": "Ridge R\u00b2=0.84 with near-zero train-test gap despite 559 sparse OHE features \u2014 the earlier concern about sparse features hurting linear models was conservative. Price has a strong additive structure well-captured by Ridge."
+  },
+  "leakage_proof": {
+    "method": "StandardScaler means embedded in pipeline match X_train means exactly",
+    "explanation": "The scaler mean_ for each numeric column matches X_train.mean() to 4 decimal places and differs from the full-dataset mean \u2014 proving the pipeline was fitted on training data only. This is verifiable without re-running training."
+  },
+  "leakage_guarantees": [
+    "price_in_euro excluded from classification features",
+    "price_segment threshold = median of y_reg_train only",
+    "ColumnTransformer and VarianceThreshold fitted on X_train only (inside Pipeline.fit)",
+    "X_test used only in pipeline.predict() and pipeline.predict_proba() \u2014 never fitted",
+    "No preprocessing step sees the full dataset after the train/test split"
+  ],
+  "saved_artifacts": {
+    "classifier_pipeline.pkl": "Complete sklearn Pipeline (preprocessor+selector+XGBoost)",
+    "regressor_pipeline.pkl": "Complete sklearn Pipeline (preprocessor+selector+XGBoost)",
+    "price_segment_threshold.json": "\u20ac19,486 \u2014 Streamlit app segment labelling"
+  },
+  "app_note": "Streamlit app receives user inputs: brand, model, fuel_type, transmission_type, year, power_ps, mileage_in_km. It computes car_age=2023-year and mileage_per_year=mileage_in_km/max(car_age,1) before calling pipeline.predict(). Feature order passed to pipeline: brand, model, fuel_type, transmission_type, car_age, power_ps, mileage_in_km, mileage_per_year."
+}

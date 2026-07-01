@@ -1,0 +1,7 @@
+{
+  "price_segment_threshold": 19486.0,
+  "label_HIGH": 1,
+  "label_LOW": 0,
+  "derivation": "median of y_reg_train (training set only \u2014 leakage-safe)",
+  "note": "Threshold used by Streamlit app to label predicted price"
+}

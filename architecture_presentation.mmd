@@ -1,0 +1,47 @@
+flowchart TB
+
+    subgraph DATA["① DATA LAYER"]
+        DS["Germany Used Cars 2023  |  Kaggle  |  ~200k rows"]
+        CLEAN["EDA and Basic Cleaning"]
+        SPLIT["Train / Test Split   random_state = 42"]
+        DS --> CLEAN --> SPLIT
+    end
+
+    subgraph TRAIN["② ML TRAINING LAYER  (offline)"]
+        THRESH["Threshold from y_train_price only\ny_train_class and y_test_class"]
+        PIPELINE["sklearn Pipeline  (train only)\nImpute, Feature Engineering, Encode/Scale, Select\ncar_age, mileage_per_year, brand_tier, hp_age_interaction"]
+        CLS["Classification Model Ladder\nDummy  |  Logistic Reg  |  Decision Tree  |  XGBoost+CV\ntarget: price_segment (high/low)  |  price excluded"]
+        REG["Regression Model Ladder\nDummy  |  Ridge Reg  |  Decision Tree  |  XGBoost+CV\ntarget: price in EUR"]
+        EVAL["TEST SET Evaluation\nAccuracy, F1, AUC-ROC  /  MAE, RMSE, R2\nLeaderboard — select best model"]
+        ARTS[("classifier_pipeline.pkl\nregressor_pipeline.pkl\nprice_segment_threshold.json")]
+
+        SPLIT -->|"train set"| THRESH
+        SPLIT -->|"features only"| PIPELINE
+        SPLIT -->|"y_train_price"| REG
+        THRESH -->|"y_train_class"| CLS
+        PIPELINE --> CLS
+        PIPELINE --> REG
+        CLS --> EVAL
+        REG --> EVAL
+        SPLIT -->|"test set"| EVAL
+        EVAL --> ARTS
+    end
+
+    subgraph INFER["③ APP / INFERENCE  (online)"]
+        UI["Browser UI\nbrand, model, mileage, hp, year, fuel, gear"]
+        APP["Streamlit App\nload pipelines and predict"]
+        RES["price_segment: HIGH or LOW\nPredicted price: X EUR\nEDA, metrics, importances"]
+        UI --> APP --> RES
+    end
+
+    subgraph DEPLOY["④ DEPLOYMENT AND DELIVERABLES"]
+        GH["GitHub Repository"]
+        SC["Streamlit Cloud"]
+        DL["Quarto Report  |  Slides  |  Summary  |  AI Reflection"]
+        GH --> SC
+        GH --> DL
+    end
+
+    ARTS -.->|"load at startup"| APP
+    GH -.->|"source of truth"| TRAIN
+    SC --> INFER

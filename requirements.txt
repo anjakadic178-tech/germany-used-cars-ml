@@ -1,0 +1,23 @@
+# Core data
+pandas>=2.0
+numpy>=1.26
+
+# Machine learning
+scikit-learn>=1.4
+xgboost>=2.0
+joblib>=1.3
+
+# Visualisation
+matplotlib>=3.8
+seaborn>=0.13
+plotly>=5.20
+
+# App
+streamlit>=1.35
+
+# Serialisation / utilities
+python-dotenv>=1.0
+
+# Reporting (Quarto renders .qmd files; these packages support inline output)
+jupyter>=1.0
+nbformat>=5.9
