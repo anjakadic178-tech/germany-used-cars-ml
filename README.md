@@ -5,7 +5,7 @@ on the Germany Used Cars 2023 dataset (AutoScout24 / Kaggle, 251,079 raw rows).
 
 ## Live App
 
-🔗 [Link will be added after deployment]
+🔗 **https://germany-used-cars-ml.streamlit.app/**
 
 ## Results
 
