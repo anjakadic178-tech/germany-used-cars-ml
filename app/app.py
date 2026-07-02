@@ -347,10 +347,19 @@ def load_car_options():
         return [], {}
 
 
+@st.cache_data(show_spinner=False)
+def load_dataset():
+    try:
+        return pd.read_csv(Path(__file__).resolve().parent / "cars_sample.csv")
+    except FileNotFoundError:
+        return None
+
+
 cls_pipe, reg_pipe, threshold_meta = load_models()
 threshold = threshold_meta["price_segment_threshold"]
 cls_lb, reg_lb = load_leaderboards()
 brands, brand_models = load_car_options()
+df_sample = load_dataset()
 
 brand_options = brands if brands else [
     "volkswagen", "bmw", "audi", "mercedes-benz", "opel", "ford",
@@ -375,6 +384,134 @@ def build_input_row(brand, model, fuel_type, transmission_type,
         "mileage_in_km":     float(mileage_in_km),
         "mileage_per_year":  float(mileage_per_year),
     }])[FEATURE_COLS]
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# Feature explanation & similarity helpers
+# ══════════════════════════════════════════════════════════════════════════
+def explain_prediction(brand, model_name, fuel_type, year, power_ps,
+                       mileage_in_km, price, df):
+    if df is None:
+        return ["Explanation unavailable — sample dataset not loaded."]
+    car_age       = float(REFERENCE_YEAR - year)
+    med_mileage   = df["mileage_in_km"].median()
+    med_age       = (REFERENCE_YEAR - df["year"]).median()
+    med_power     = df["power_ps"].median()
+    overall_med   = df["price_in_euro"].median()
+    bullets = []
+
+    if mileage_in_km < med_mileage * 0.75:
+        bullets.append(
+            f"**Low mileage** ({mileage_in_km:,.0f} km vs dataset avg {med_mileage:,.0f} km)"
+            f" — in this dataset, lower mileage is likely associated with higher prices"
+        )
+    elif mileage_in_km > med_mileage * 1.25:
+        bullets.append(
+            f"**High mileage** ({mileage_in_km:,.0f} km vs dataset avg {med_mileage:,.0f} km)"
+            f" — in this dataset, higher mileage is likely associated with lower prices"
+        )
+    else:
+        bullets.append(
+            f"**Average mileage** ({mileage_in_km:,.0f} km)"
+            f" — close to the dataset average of {med_mileage:,.0f} km"
+        )
+
+    if car_age < med_age * 0.75:
+        bullets.append(
+            f"**Newer registration** ({year}, {car_age:.0f} yr old)"
+            f" — in this dataset, newer cars are likely priced higher"
+        )
+    elif car_age > med_age * 1.25:
+        bullets.append(
+            f"**Older car** ({year}, {car_age:.0f} yr old)"
+            f" — in this dataset, older registration is likely associated with lower prices"
+        )
+    else:
+        bullets.append(
+            f"**Average age** ({car_age:.0f} years)"
+            f" — similar to the dataset average of {med_age:.1f} years"
+        )
+
+    if power_ps > med_power * 1.35:
+        bullets.append(
+            f"**High horsepower** ({power_ps:.0f} PS vs avg {med_power:.0f} PS)"
+            f" — in this dataset, higher PS is likely associated with higher prices"
+        )
+    elif power_ps < med_power * 0.70:
+        bullets.append(
+            f"**Lower horsepower** ({power_ps:.0f} PS vs avg {med_power:.0f} PS)"
+            f" — typically seen in more affordable segments in this dataset"
+        )
+
+    brand_df = df[df["brand"] == brand]
+    if len(brand_df) >= 10:
+        brand_med   = brand_df["price_in_euro"].median()
+        brand_label = brand.replace("-", " ").title()
+        if brand_med > overall_med * 1.2:
+            bullets.append(
+                f"**{brand_label}** median price €{brand_med:,.0f} in this dataset"
+                f" — above the overall median (€{overall_med:,.0f})"
+            )
+        elif brand_med < overall_med * 0.85:
+            bullets.append(
+                f"**{brand_label}** median price €{brand_med:,.0f} in this dataset"
+                f" — below the overall median (€{overall_med:,.0f})"
+            )
+
+    if "electric" in fuel_type.lower():
+        bullets.append(
+            "**Electric** fuel type — EVs often carry higher prices for newer model years"
+            " in this dataset"
+        )
+    elif "hybrid" in fuel_type.lower():
+        bullets.append(
+            "**Hybrid** fuel type — hybrids tend to be in the mid-to-high price range"
+            " in this dataset"
+        )
+
+    return bullets[:5]
+
+
+def find_similar_cars(brand, model_name, year, power_ps, mileage_in_km, df, n=8):
+    if df is None:
+        return None
+    car_age = float(REFERENCE_YEAR - year)
+
+    candidate = df[df["model"] == model_name].copy()
+    if len(candidate) < 5:
+        candidate = df[df["brand"] == brand].copy()
+    if len(candidate) < 5:
+        candidate = df.copy()
+
+    std_mileage = max(df["mileage_in_km"].std(), 1.0)
+    std_age     = max((REFERENCE_YEAR - df["year"]).std(), 1.0)
+    std_power   = max(df["power_ps"].std(), 1.0)
+
+    candidate = candidate.copy()
+    candidate["_age"]   = REFERENCE_YEAR - candidate["year"]
+    candidate["_score"] = (
+        (candidate["mileage_in_km"] - mileage_in_km).abs() / std_mileage
+        + (candidate["_age"] - car_age).abs() / std_age
+        + (candidate["power_ps"] - power_ps).abs() / std_power
+    )
+
+    result = candidate.nsmallest(n, "_score").copy()
+    result = result.drop(columns=["_age", "_score"])
+    result = result.rename(columns={
+        "brand":             "Brand",
+        "model":             "Model",
+        "year":              "Year",
+        "mileage_in_km":     "Mileage (km)",
+        "fuel_type":         "Fuel",
+        "transmission_type": "Transmission",
+        "power_ps":          "HP (PS)",
+        "price_in_euro":     "Price (€)",
+    })
+    result["Year"]         = result["Year"].astype(int)
+    result["Mileage (km)"] = result["Mileage (km)"].astype(int)
+    result["HP (PS)"]      = result["HP (PS)"].astype(int)
+    result["Price (€)"]    = result["Price (€)"].apply(lambda v: f"€{v:,.0f}")
+    return result.reset_index(drop=True)
 
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -542,6 +679,35 @@ if predict_btn:
         )
         st.dataframe(input_df, use_container_width=True, hide_index=True)
 
+    # ── Why this price? ───────────────────────────────────────────────
+    with st.expander("Why this price?", expanded=False):
+        st.caption(
+            "Rule-based comparison of this car against the dataset sample. "
+            "All statements say *in this dataset* or *likely* and are not guarantees."
+        )
+        bullets = explain_prediction(
+            brand, model, fuel_type, year, power_ps, mileage_in_km, price, df_sample
+        )
+        for b in bullets:
+            st.markdown(f"- {b}")
+
+    # ── Similar cars ──────────────────────────────────────────────────
+    with st.expander("Similar cars in the dataset", expanded=False):
+        st.caption(
+            "Matched first by model, then by brand, then sorted by numeric closeness "
+            "(mileage · age · horsepower). Prices are actual listing prices from the dataset."
+        )
+        similar = find_similar_cars(
+            brand, model, year, power_ps, mileage_in_km, df_sample, n=8
+        )
+        if similar is not None and len(similar) > 0:
+            st.dataframe(similar, use_container_width=True, hide_index=True)
+        else:
+            st.info(
+                "Sample dataset not available. "
+                "Place cars_sample.csv in the app/ folder to enable this feature."
+            )
+
 else:
     # ── Idle state ────────────────────────────────────────────────────
     st.markdown("""
@@ -553,6 +719,121 @@ else:
   </div>
 </div>
 """, unsafe_allow_html=True)
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# WHAT IF COMPARISON
+# ══════════════════════════════════════════════════════════════════════════
+st.markdown(
+    '<div class="section-header">What If Comparison</div>',
+    unsafe_allow_html=True,
+)
+
+with st.expander("What if I compare two cars?", expanded=False):
+    st.caption(
+        "Configure two cars and click **Compare** to see their predicted prices side by side."
+    )
+    col_a, col_mid, col_b = st.columns([5, 0.4, 5])
+
+    with col_a:
+        st.markdown("**Car A**")
+        wa_brand = st.selectbox(
+            "Brand", brand_options, key="wa_brand",
+            index=brand_options.index("volkswagen") if "volkswagen" in brand_options else 0,
+            format_func=lambda x: x.replace("-", " ").title(),
+        )
+        wa_avail = brand_models.get(wa_brand, [wa_brand.title() + " model"])
+        wa_model = st.selectbox("Model", wa_avail, key="wa_model")
+        wa_fuel  = st.selectbox(
+            "Fuel type",
+            ["Petrol","Diesel","Hybrid","Electric","LPG","CNG",
+             "Diesel Hybrid","Ethanol","Hydrogen","Other"],
+            key="wa_fuel",
+        )
+        wa_trans = st.selectbox(
+            "Transmission", ["Manual","Automatic","Semi-automatic"], key="wa_trans"
+        )
+        wa_year  = st.slider("Registration year", 2000, 2023, 2015, 1, key="wa_year")
+        wa_power = st.number_input("Horsepower (PS)", 41, 799, 150, 5, key="wa_power")
+        wa_mile  = st.number_input("Mileage (km)", 1, 500_000, 80_000, 1_000, key="wa_mile")
+
+    with col_mid:
+        st.markdown(
+            "<div style='text-align:center;color:#b8960c;"
+            "margin-top:5rem;font-size:1.4rem;font-weight:700'>vs</div>",
+            unsafe_allow_html=True,
+        )
+
+    with col_b:
+        st.markdown("**Car B**")
+        wb_brand = st.selectbox(
+            "Brand", brand_options, key="wb_brand",
+            index=brand_options.index("bmw") if "bmw" in brand_options else 0,
+            format_func=lambda x: x.replace("-", " ").title(),
+        )
+        wb_avail = brand_models.get(wb_brand, [wb_brand.title() + " model"])
+        wb_model = st.selectbox("Model", wb_avail, key="wb_model")
+        wb_fuel  = st.selectbox(
+            "Fuel type",
+            ["Petrol","Diesel","Hybrid","Electric","LPG","CNG",
+             "Diesel Hybrid","Ethanol","Hydrogen","Other"],
+            key="wb_fuel",
+        )
+        wb_trans = st.selectbox(
+            "Transmission", ["Manual","Automatic","Semi-automatic"], key="wb_trans"
+        )
+        wb_year  = st.slider("Registration year", 2000, 2023, 2018, 1, key="wb_year")
+        wb_power = st.number_input("Horsepower (PS)", 41, 799, 200, 5, key="wb_power")
+        wb_mile  = st.number_input("Mileage (km)", 1, 500_000, 40_000, 1_000, key="wb_mile")
+
+    compare_btn = st.button(
+        "Compare Cars", use_container_width=True, type="primary", key="compare_btn"
+    )
+
+    if compare_btn:
+        in_a = build_input_row(wa_brand, wa_model, wa_fuel, wa_trans, wa_year, wa_power, wa_mile)
+        in_b = build_input_row(wb_brand, wb_model, wb_fuel, wb_trans, wb_year, wb_power, wb_mile)
+
+        pa  = float(reg_pipe.predict(in_a)[0])
+        pb  = float(reg_pipe.predict(in_b)[0])
+        sa  = "HIGH" if int(cls_pipe.predict(in_a)[0]) == 1 else "LOW"
+        sb  = "HIGH" if int(cls_pipe.predict(in_b)[0]) == 1 else "LOW"
+        ca  = cls_pipe.predict_proba(in_a)[0].max() * 100
+        cb  = cls_pipe.predict_proba(in_b)[0].max() * 100
+        diff     = pb - pa
+        pct_diff = (diff / pa * 100) if pa > 0 else 0.0
+
+        comp_df = pd.DataFrame({
+            "": [
+                "Brand", "Model", "Year", "Mileage", "Fuel",
+                "Transmission", "Horsepower", "Estimated Price",
+                "Price Segment", "Segment Confidence",
+            ],
+            "Car A": [
+                wa_brand.replace("-", " ").title(), wa_model, str(wa_year),
+                f"{wa_mile:,} km", wa_fuel, wa_trans, f"{wa_power} PS",
+                f"€{pa:,.0f}", sa, f"{ca:.1f}%",
+            ],
+            "Car B": [
+                wb_brand.replace("-", " ").title(), wb_model, str(wb_year),
+                f"{wb_mile:,} km", wb_fuel, wb_trans, f"{wb_power} PS",
+                f"€{pb:,.0f}", sb, f"{cb:.1f}%",
+            ],
+        })
+        st.dataframe(comp_df, use_container_width=True, hide_index=True)
+
+        if abs(diff) < 1:
+            st.info("Both cars have the same estimated price.")
+        elif diff > 0:
+            st.success(
+                f"Car B is estimated **€{abs(diff):,.0f} more expensive** than Car A"
+                f" ({abs(pct_diff):.1f}% higher)"
+            )
+        else:
+            st.success(
+                f"Car A is estimated **€{abs(diff):,.0f} more expensive** than Car B"
+                f" ({abs(pct_diff):.1f}% higher)"
+            )
 
 
 # ══════════════════════════════════════════════════════════════════════════
