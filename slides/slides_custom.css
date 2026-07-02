@@ -1,0 +1,74 @@
+/* Gold accent for headings */
+.reveal h1, .reveal h2 {
+  color: #1c1c1c;
+  border-bottom: 2px solid #b8960c;
+  padding-bottom: 0.25rem;
+}
+
+.reveal h3 {
+  color: #7a6005;
+}
+
+/* Subtle gold highlight for strong text */
+.reveal strong {
+  color: #8a6e05;
+}
+
+/* Table styling */
+.reveal table {
+  font-size: 0.78em;
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.reveal table th {
+  background-color: #f0ede7;
+  color: #1c1c1c;
+  font-size: 0.82em;
+  letter-spacing: 0.04em;
+  border-bottom: 2px solid #b8960c;
+  padding: 0.5rem 0.7rem;
+}
+
+.reveal table td {
+  padding: 0.4rem 0.7rem;
+  border-bottom: 1px solid #e8e4d8;
+  color: #3a3530;
+}
+
+.reveal table tr:last-child td {
+  font-weight: 600;
+  color: #1c1c1c;
+}
+
+/* Code block */
+.reveal pre {
+  font-size: 0.72em;
+  background: #f8f7f4;
+  border: 1px solid #e0dbd0;
+  border-left: 3px solid #b8960c;
+  border-radius: 6px;
+  padding: 0.8rem 1rem;
+}
+
+/* Footer */
+.reveal .footer {
+  font-size: 0.55em;
+  color: #a09880;
+}
+
+/* Slide number */
+.reveal .slide-number {
+  color: #b8960c;
+  background: transparent;
+}
+
+/* Column layout spacing */
+.reveal .columns {
+  gap: 1.5rem;
+}
+
+/* Smaller text class */
+.reveal .smaller {
+  font-size: 0.82em;
+}

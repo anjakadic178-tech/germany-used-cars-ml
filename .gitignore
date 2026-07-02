@@ -41,6 +41,7 @@ app/assets/
 *_cache/
 reports/*.html
 slides/*.html
+!slides/slides.html
 
 # Models (large binaries — optionally commit via Git LFS)
 # Remove lines below if you want to commit models directly
