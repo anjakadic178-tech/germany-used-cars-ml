@@ -514,6 +514,36 @@ def find_similar_cars(brand, model_name, year, power_ps, mileage_in_km, df, n=8)
     return result.reset_index(drop=True)
 
 
+_ALL_FUELS = ["Petrol", "Diesel", "Hybrid", "Electric",
+              "LPG", "CNG", "Diesel Hybrid", "Ethanol", "Hydrogen", "Other"]
+
+def get_fuel_options(brand, model_name, df):
+    """Return fuel types that actually exist for this brand+model in the dataset."""
+    if df is None:
+        return _ALL_FUELS
+    subset = df[(df["brand"] == brand) & (df["model"] == model_name)]
+    if len(subset) == 0:
+        subset = df[df["brand"] == brand]  # fall back to brand level
+    fuels = sorted(subset["fuel_type"].dropna().unique().tolist())
+    return fuels if fuels else _ALL_FUELS
+
+
+def get_median_power(brand, model_name, fuel_type, df):
+    """Impute horsepower using the narrowest available group median."""
+    if df is None:
+        return 150.0
+    for mask in [
+        (df["brand"] == brand) & (df["model"] == model_name) & (df["fuel_type"] == fuel_type),
+        (df["brand"] == brand) & (df["model"] == model_name),
+        (df["brand"] == brand),
+    ]:
+        subset = df[mask]["power_ps"].dropna()
+        if len(subset) >= 3:
+            return float(subset.median())
+    overall = df["power_ps"].dropna()
+    return float(overall.median()) if len(overall) > 0 else 150.0
+
+
 # ══════════════════════════════════════════════════════════════════════════
 # SIDEBAR — inputs
 # ══════════════════════════════════════════════════════════════════════════
@@ -537,11 +567,10 @@ with st.sidebar:
     else:
         model = st.text_input("Model", value=f"{brand.title()} Model")
 
-    fuel_type = st.selectbox(
-        "Fuel type",
-        options=["Petrol", "Diesel", "Hybrid", "Electric",
-                 "LPG", "CNG", "Diesel Hybrid", "Ethanol", "Hydrogen", "Other"],
-    )
+    # Fuel options filtered to only those that appear for this brand+model in the dataset
+    _fuel_opts = get_fuel_options(brand, model, df_sample)
+    fuel_type = st.selectbox("Fuel type", options=_fuel_opts)
+
     transmission_type = st.selectbox(
         "Transmission",
         options=["Manual", "Automatic", "Semi-automatic"],
@@ -550,20 +579,36 @@ with st.sidebar:
     st.markdown('<div class="sidebar-group">Year & Performance</div>',
                 unsafe_allow_html=True)
 
-    year     = st.slider("Registration year", min_value=2000, max_value=2023,
-                         value=2015, step=1)
-    power_ps = st.number_input("Horsepower (PS)", min_value=41, max_value=799,
-                                value=150, step=5)
+    # Year range slider — prediction uses the midpoint year
+    year_range = st.slider(
+        "Registration year range", min_value=2000, max_value=2023,
+        value=(2015, 2020), step=1,
+    )
+    min_year, max_year = year_range
+    year = (min_year + max_year) // 2  # midpoint sent to the model
+    st.caption("Used for matching comparable cars; prediction uses the midpoint year.")
+
+    # Optional horsepower — falls back to dataset median when unknown
+    know_ps = st.checkbox("I know the horsepower", value=True)
+    if know_ps:
+        power_ps = st.number_input("Horsepower (PS)", min_value=41, max_value=799,
+                                    value=150, step=5)
+    else:
+        power_ps = get_median_power(brand, model, fuel_type, df_sample)
+        st.caption(f"If unknown, the app estimates a typical horsepower value from similar cars.  \n"
+                   f"Estimated: **{power_ps:.0f} PS**")
 
     st.markdown('<div class="sidebar-group">Usage</div>', unsafe_allow_html=True)
 
+    # Maximum mileage — used as the mileage input for prediction and as upper filter for comparisons
     mileage_in_km = st.number_input(
-        "Mileage (km)", min_value=1, max_value=500_000, value=80_000, step=1_000,
+        "Maximum mileage (km)", min_value=1, max_value=500_000, value=100_000, step=1_000,
     )
+    st.caption("Prediction assumes a car with this mileage; comparisons show cars up to this mileage.")
 
     _age = REFERENCE_YEAR - year
     _mpy = mileage_in_km // max(_age, 1)
-    st.caption(f"car age: {_age} yr  ·  ≈ {_mpy:,} km/yr")
+    st.caption(f"midpoint car age: {_age} yr  ·  ≈ {_mpy:,} km/yr")
 
     st.write("")
     predict_btn = st.button("Estimate Value", use_container_width=True, type="primary")
@@ -697,8 +742,20 @@ if predict_btn:
             "Matched first by model, then by brand, then sorted by numeric closeness "
             "(mileage · age · horsepower). Prices are actual listing prices from the dataset."
         )
+        # Pre-filter dataset by year range and max mileage before similarity scoring
+        _sim_df = df_sample
+        if _sim_df is not None:
+            _sim_df = _sim_df[
+                (_sim_df["mileage_in_km"] <= mileage_in_km)
+                & (_sim_df["year"] >= min_year)
+                & (_sim_df["year"] <= max_year)
+            ]
+            if len(_sim_df) < 5:  # too few results — relax year filter, keep mileage
+                _sim_df = df_sample[df_sample["mileage_in_km"] <= mileage_in_km]
+            if len(_sim_df) < 5:  # still too few — use full sample
+                _sim_df = df_sample
         similar = find_similar_cars(
-            brand, model, year, power_ps, mileage_in_km, df_sample, n=8
+            brand, model, year, power_ps, mileage_in_km, _sim_df, n=8
         )
         if similar is not None and len(similar) > 0:
             st.dataframe(similar, use_container_width=True, hide_index=True)
