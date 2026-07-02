@@ -865,6 +865,19 @@ with tab_cls:
     ]
     st.dataframe(display_cls, use_container_width=True, hide_index=True)
 
+    with st.expander("What do these metrics mean?", expanded=False):
+        st.markdown("""
+| Metric | What it means | Good value |
+|---|---|---|
+| **Accuracy** | Out of all predictions, how many were correct? e.g. 0.93 = 93% correct | Close to 1 |
+| **F1 (binary)** | Balances precision and recall for one class only. Can look good even if the model always guesses the same class — not fully reliable on its own | Close to 1 |
+| **F1 (macro)** | Average F1 across both classes (HIGH and LOW). The honest metric here — a model that always guesses HIGH gets only 0.333, not 0.667 | Close to 1 |
+| **ROC-AUC** | How well the model separates HIGH from LOW cars. 0.5 = guessing randomly, 1.0 = perfect separation | Close to 1 |
+| **Train Acc / Train F1** | Same metrics but measured on the training data. If much higher than the test values, the model memorised instead of learning (overfitting) | Similar to test value |
+
+**Our result:** XGBoost achieves F1_macro **0.934** and AUC **0.982** on 48,004 cars it never saw during training.
+""")
+
     col_a, col_b = st.columns(2)
     with col_a:
         p = FIG_DIR / "roc_curve.png"
@@ -894,6 +907,19 @@ with tab_reg:
         "Model", "R²", "MAE (€)", "RMSE (€)", "Train R²", "Train RMSE (€)",
     ]
     st.dataframe(display_reg, use_container_width=True, hide_index=True)
+
+    with st.expander("What do these metrics mean?", expanded=False):
+        st.markdown("""
+| Metric | What it means | Good value |
+|---|---|---|
+| **R²** | How much of the price variation the model explains. 0 = no better than guessing the average, 1 = perfect | Close to 1 |
+| **MAE (€)** | Mean Absolute Error — the average prediction error in euros. e.g. MAE €2,602 means the model is off by €2,602 on average | As low as possible |
+| **RMSE (€)** | Root Mean Squared Error — similar to MAE but punishes large mistakes more heavily. Always ≥ MAE | As low as possible |
+| **Train R² / Train RMSE** | Same metrics on training data. If Train R² is much higher than Test R², the model memorised instead of learning (overfitting) | Similar to test value |
+
+**Our result:** XGBoost achieves R² **0.905** and MAE **€2,602** on 48,004 cars it never saw during training.
+The Dummy baseline (always predict average price) has R² **0.000** and MAE **€10,915** — our model is roughly 4× more accurate.
+""")
 
     col_a, col_b = st.columns(2)
     with col_a:
