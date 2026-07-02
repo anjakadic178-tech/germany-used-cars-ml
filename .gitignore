@@ -40,6 +40,7 @@ app/assets/
 *_files/
 *_cache/
 reports/*.html
+!reports/report.html
 slides/*.html
 !slides/slides.html
 
