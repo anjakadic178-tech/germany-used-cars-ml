@@ -15,6 +15,7 @@ format:
     fig-align: center
     margin: 0.08
     css: slides_custom.css
+    preview-links: false
 ---
 
 ## Project Overview {background-color="#faf9f6"}

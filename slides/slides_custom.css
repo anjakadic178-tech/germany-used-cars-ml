@@ -72,3 +72,40 @@
 .reveal .smaller {
   font-size: 0.82em;
 }
+
+/* ── Slide 4: Data Cleaning table — compact to avoid overflow ────────── */
+#data-cleaning-12-sequential-steps table {
+  font-size: 0.62em;
+}
+#data-cleaning-12-sequential-steps table th,
+#data-cleaning-12-sequential-steps table td {
+  padding: 0.18rem 0.55rem;
+}
+#data-cleaning-12-sequential-steps p {
+  margin-bottom: 0.3em;
+}
+
+/* ── Slide 11: Regression Ladder — keep bullets on-screen ───────────── */
+#regression-model-ladder table {
+  font-size: 0.68em;
+  margin-bottom: 0.35em;
+}
+#regression-model-ladder table th,
+#regression-model-ladder table td {
+  padding: 0.18rem 0.4rem;
+}
+#regression-model-ladder ul {
+  font-size: 0.76em;
+  margin-top: 0.2em;
+}
+#regression-model-ladder ul li {
+  margin-top: 0.15em;
+  margin-bottom: 0;
+}
+
+/* ── Column images: constrain height so they never overflow ─────────── */
+.reveal .columns img {
+  max-height: 46vh;
+  width: 100%;
+  object-fit: contain;
+}
